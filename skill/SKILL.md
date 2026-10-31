@@ -1,7 +1,7 @@
 ---
 name: wizard-whoop
 description: Use when the owner asks about his WHOOP connection, WHOOP setup or sync. Health questions go to Health.
-version: 0.2.4
+version: 0.2.5
 author: Humanity Labs
 license: GPL-3.0-only
 metadata:

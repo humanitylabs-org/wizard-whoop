@@ -34,7 +34,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'wizard-whoop'
-VERSION = '0.2.4'
+VERSION = '0.2.5'
 PREFIX = '/' + APP_ID
 PORT = os.environ.get('PORT', '8824')
 OAUTH_BASE = os.environ.get('WHOOP_OAUTH_BASE', 'https://api.prod.whoop.com/oauth/oauth2').rstrip('/')
@@ -580,8 +580,8 @@ CONTRACT = 'wizard.health-data/1'
 SOURCE = {'id': APP_ID, 'provider': 'whoop', 'name': 'WHOOP', 'app_path': PREFIX + '/'}
 SCALES = {'readiness': {'label': 'Recovery', 'min': 0, 'max': 100},
           'sleep_score': {'label': 'Sleep performance', 'min': 0, 'max': 100},
-          'load': {'label': 'Strain', 'min': 0, 'max': 21}}
-LOAD = {'max': 21, 'label': 'Strain'}
+          'load': {'label': 'Strain', 'min': 0, 'max': 21, 'scale_max': 21}}
+LOAD = {'max': 21, 'scale_max': 21, 'label': 'Strain'}   # scale_max: Health sets activity targets on it
 STATES = {'SCORED': 'scored', 'PENDING_SCORE': 'pending', 'UNSCORABLE': 'unscorable'}
 
 

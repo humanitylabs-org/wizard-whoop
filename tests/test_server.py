@@ -259,7 +259,7 @@ class HealthTest(unittest.TestCase):
         self.assertEqual(st['account'], {'name': 'Sam'})
         self.assertEqual(st['contract'], 'wizard.health-data/1')
         self.assertEqual(st['source'], {'id': 'wizard-whoop', 'provider': 'whoop', 'name': 'WHOOP', 'app_path': '/wizard-whoop/'})
-        self.assertEqual(st['scales']['load'], {'label': 'Strain', 'min': 0, 'max': 21})
+        self.assertEqual(st['scales']['load'], {'label': 'Strain', 'min': 0, 'max': 21, 'scale_max': 21})
         cycle_pages = [c for c in FAKE.calls if c[0] == 'GET' and c[1] == '/developer/v2/cycle']
         self.assertGreaterEqual(len(cycle_pages), 3)                    # 60 records / 25 per page, plus the retried calls
         self.assertTrue(all('start' not in c[2] for c in cycle_pages))   # backfill = full history
@@ -284,7 +284,7 @@ class HealthTest(unittest.TestCase):
         self.assertEqual(d['sleep']['deep_h'], 1.5)
         self.assertEqual(d['sleep']['need_h'], 7.83)
         self.assertEqual(d['sleep']['score'], 88)
-        self.assertEqual(d['load'], {'value': 8 + (DAYS - 1) % 10, 'max': 21, 'label': 'Strain'})
+        self.assertEqual(d['load'], {'value': 8 + (DAYS - 1) % 10, 'max': 21, 'scale_max': 21, 'label': 'Strain'})
         self.assertEqual(d['calories_kcal'], round((9000 + DAYS - 1) / 4.184))
         self.assertEqual(d['extras']['whoop']['sleep_id'], f'sleep-{DAYS - 1:04d}')
         self.assertEqual(d['spo2_pct'], 96.4)
@@ -470,7 +470,8 @@ def check_day(t, d):
     if d['sleep']:
         t.assertTrue(SLEEP_KEYS <= set(d['sleep']), SLEEP_KEYS - set(d['sleep']))
     if d['load']:
-        t.assertEqual(set(d['load']), {'value', 'max', 'label'})
+        t.assertEqual(set(d['load']), {'value', 'max', 'scale_max', 'label'})
+        t.assertEqual(d['load']['scale_max'], 21)
     for w in d['workouts']:
         t.assertTrue(WORKOUT_KEYS <= set(w), WORKOUT_KEYS - set(w))
     t.assertEqual(set(d['extras']), {'whoop'})
