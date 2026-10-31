@@ -34,7 +34,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'wizard-whoop'
-VERSION = '0.2.5'
+VERSION = '0.2.6'
 PREFIX = '/' + APP_ID
 PORT = os.environ.get('PORT', '8824')
 OAUTH_BASE = os.environ.get('WHOOP_OAUTH_BASE', 'https://api.prod.whoop.com/oauth/oauth2').rstrip('/')

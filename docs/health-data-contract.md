@@ -35,8 +35,10 @@ The same file lives in both repos (`wizard-whoop/docs/` and `wizard-health/docs/
 - Per day the front end uses the main source's record. A metric the main source lacks that day (no `sleep`, no
   `readiness.score`, a `null` number) is taken whole from the first other source that has it, and the front end
   shows where it came from. A readiness the main source marks `pending` is not filled from elsewhere.
-- A connector without a readiness score at all leaves `scales.readiness` out (or `null`) and sends
-  `"readiness": null` in its days. The front end then says it has no score from that source and never computes one.
+- A connector without a readiness score at all says so in its status: `scales.readiness` left out, `null`, or
+  `{"label": ..., "available": false}` (a missing `available` means `true`), optionally also
+  `"provides": {"readiness": false}`. Its days carry `"readiness": null`. The front end then says it has no score
+  from that source (grey), may still show `hrv_ms` and `resting_hr_bpm`, and never derives a score from them.
 
 ## Transport and safety
 
@@ -80,13 +82,17 @@ The same file lives in both repos (`wizard-whoop/docs/` and `wizard-health/docs/
   (WHOOP "Strain", Garmin "Training load", Oura "Activity") and never assumes a provider's scale.
 - `scales.load` (and every `load` in the days) may carry, additively:
   - `scale_max`: the top of the load scale the front end judges effort on (WHOOP `21`). Without it the front end
-    uses `max`. A front end that sets activity targets from the recovery band takes WHOOP's guidance as fractions
-    of the scale (Ready 14/21-18/21, So-so 10/21-14/21, Run down under 10/21 of `scale_max`), so WHOOP's own
-    numbers stay 14-18, 10-14 and under 10.
+    uses `max`. For an open-ended scale (`max: null`, e.g. Active Zone Minutes) it is the top of the drawing scale.
+    A front end that sets activity targets from the recovery band takes WHOOP's guidance as fractions of the scale
+    (Ready 14/21-18/21, So-so 10/21-14/21, Run down under 10/21 of `scale_max`, "a bit much" up to 3/21 above), so
+    WHOOP's own numbers stay 14-18, 10-14 and under 10.
   - `targets`: the provider's own target per readiness band, `{"high": [lo, hi], "medium": [lo, hi], "low": [0, hi]}`
     on the load's own scale. When present the front end uses these instead of the fractions.
-  - `unit`: how to name an open-ended load with no top (`"zone minutes"`); the front end shows it instead of
-    "out of `scale_max`".
+  - `over_margin`: how far above a target's top is still "a bit much" (beyond it: "too much"), on the same scale.
+    Without it: 3/21 of `scale_max`.
+  - `unit`: the short unit of the value (`"min"`). A load with a numeric `max` reads "out of `max`"; an open-ended
+    one reads as its `label` ("34 active zone minutes").
+  A day's `load` may leave these out when `scales.load` has them; the front end takes them from `scales.load`.
   A load with no `scale_max`, no `max` and no `targets` gets no activity target (no colour), never a guessed one.
 - A connector may add its own fields (the WHOOP app adds its setup state); front ends ignore unknown fields.
 
