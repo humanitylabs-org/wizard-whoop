@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" data-app="wizard-whoop">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>WHOOP</title>
+  <script src="boot.js"></script>
+  <link rel="stylesheet" href="wizard-tokens.css">
+  <link rel="stylesheet" href="wizard-ui.css">
+  <link rel="stylesheet" href="standalone.css">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="/wizard-os-home/core/app-client.js"></script>
+  <script defer src="wizard-sheet.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="wz-app">
+    <main class="wz-scroll" id="main">
+      <section class="hl-top" aria-label="WHOOP connection">
+        <div class="wz-conn hl-solid">
+          <div class="wz-tile hl-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/></svg></div>
+          <div class="wz-main"><b>WHOOP</b><small id="conn-line">Checking…</small></div>
+          <span id="conn-pill" class="wz-pill off">…</span>
+        </div>
+      </section>
+
+      <!-- Connected: the account, one action, details. -->
+      <section id="account" class="hl-account" hidden aria-label="Connected account">
+        <ul class="wz-list hl-solid hl-rows">
+          <li class="wz-row">
+            <span class="wz-tile hl-avatar" id="acct-initial" aria-hidden="true">W</span>
+            <span class="wz-main"><b id="acct-name">WHOOP account</b><small id="acct-sub"></small></span>
+          </li>
+          <li class="wz-row">
+            <span class="wz-tile hl-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>
+            <span class="wz-main"><b id="sync-title">Synced</b><small id="sync-sub"></small></span>
+          </li>
+        </ul>
+        <p id="sync-error" class="hl-warn" hidden></p>
+        <div class="wz-actions">
+          <button type="button" class="wz-button" id="sync-now">Sync now</button>
+          <a class="wz-button secondary" id="open-health" href="/wizard-health/">Open Health</a>
+        </div>
+        <p class="hl-hint hl-pad">Your recovery, sleep, strain and workouts show in the Health app. This app only keeps the WHOOP sign-in and the synced copy.</p>
+      </section>
+
+      <!-- Guided setup: shown until WHOOP is connected. One step open at a time. -->
+      <section id="setup" class="hl-setup" hidden aria-label="Set up WHOOP">
+        <p class="hl-lead">Connect your WHOOP in five short steps. Everything happens here and on WHOOP's own site.</p>
+        <ol class="hl-steps">
+          <li class="hl-step" data-step="1">
+            <button type="button" class="hl-step-h"><span class="hl-num">1</span><span class="hl-step-t">Have a WHOOP membership</span></button>
+            <div class="hl-step-b">
+              <p>You need an active WHOOP membership on any tier (One, Peak or Life). WHOOP's developer access, which this app uses, is free.</p>
+              <p class="hl-hint">No membership yet? <a id="signup-link" target="_blank" rel="noopener noreferrer">See WHOOP memberships</a>.</p>
+              <div class="wz-actions"><button type="button" class="wz-button" data-next="2">I have a membership</button></div>
+            </div>
+          </li>
+          <li class="hl-step" data-step="2">
+            <button type="button" class="hl-step-h"><span class="hl-num">2</span><span class="hl-step-t">Open the WHOOP Developer Dashboard</span></button>
+            <div class="hl-step-b">
+              <ol class="hl-sub">
+                <li>Open the dashboard and sign in with your usual WHOOP email and password.</li>
+                <li>If it asks you to create a Team, do it. Any team name works, for example your own name.</li>
+              </ol>
+              <div class="wz-actions">
+                <a class="wz-button" id="dash-link" target="_blank" rel="noopener noreferrer">Open WHOOP Developer Dashboard</a>
+                <button type="button" class="wz-button secondary" data-next="3">Done, next</button>
+              </div>
+            </div>
+          </li>
+          <li class="hl-step" data-step="3">
+            <button type="button" class="hl-step-h"><span class="hl-num">3</span><span class="hl-step-t">Create an app on WHOOP</span></button>
+            <div class="hl-step-b">
+              <p>On the dashboard, tap <b>Create App</b> and fill it in with these values. Each has a Copy button.</p>
+              <div class="hl-field"><span>Name</span><div class="hl-copy"><input id="v-name" readonly aria-label="App name"><button type="button" class="hl-cbtn" data-copy="v-name">Copy</button></div></div>
+              <div class="hl-field">
+                <span>Redirect URL</span>
+                <div class="hl-copy"><textarea id="v-redirect" rows="2" readonly spellcheck="false" aria-label="Redirect URL"></textarea><button type="button" class="hl-cbtn" data-copy="v-redirect">Copy</button></div>
+                <small id="redir-note" class="hl-hint"></small>
+                <button type="button" class="hl-link" id="redir-other" hidden></button>
+              </div>
+              <div class="hl-field"><span>Scopes: tick all six</span>
+                <ul class="hl-scopes" id="v-scopes"></ul>
+                <div class="hl-copy"><input id="v-scopes-all" readonly aria-label="All scopes"><button type="button" class="hl-cbtn" data-copy="v-scopes-all">Copy all</button></div>
+              </div>
+              <div class="hl-field"><span>Webhook URL</span><p class="hl-plain">Leave it blank. This box is private, so WHOOP can't reach it; the app checks for new data every 20 minutes instead.</p></div>
+              <div class="hl-field"><span>Privacy policy and logo</span><p class="hl-plain">WHOOP may ask for a privacy policy link and a square PNG logo. For a personal app, any page you control works as the link. <a id="logo-link" download="wizard-whoop-logo.png">Download a square logo</a>.</p></div>
+              <p>Tap <b>Create</b>. WHOOP then shows your app's <b>Client ID</b> and <b>Client Secret</b>.</p>
+              <div class="wz-actions"><button type="button" class="wz-button" data-next="4">Next</button></div>
+            </div>
+          </li>
+          <li class="hl-step" data-step="4">
+            <button type="button" class="hl-step-h"><span class="hl-num">4</span><span class="hl-step-t">Paste your Client ID and Client Secret</span></button>
+            <div class="hl-step-b">
+              <div id="keys-saved" class="hl-saved" hidden>
+                <p><b>Keys saved.</b> Client ID <span id="cid-hint" class="hl-mono"></span>, Client Secret saved (hidden).</p>
+                <p class="hl-hint">Redirect URL: <span id="saved-redirect" class="hl-mono"></span></p>
+              </div>
+              <form id="keys-form" class="hl-form" autocomplete="off">
+                <label>Client ID<input class="wz-input" id="f-cid" name="client_id" autocomplete="off" spellcheck="false" required></label>
+                <label>Client Secret<input class="wz-input" id="f-secret" name="client_secret" type="password" autocomplete="new-password" spellcheck="false" required></label>
+                <label>Redirect URL, exactly as entered on WHOOP<input class="wz-input" id="f-redirect" name="redirect_uri" spellcheck="false" required></label>
+                <div class="wz-actions"><button type="submit" class="wz-button" id="keys-save">Save and test keys</button></div>
+              </form>
+              <div class="wz-actions">
+                <button type="button" class="wz-button secondary" id="keys-test">Test keys</button>
+                <button type="button" class="wz-button secondary" id="keys-replace" hidden>Replace keys</button>
+                <button type="button" class="wz-button" id="keys-next" data-next="5" hidden>Next</button>
+              </div>
+              <p id="test-result" class="hl-result" role="status" aria-live="polite"></p>
+            </div>
+          </li>
+          <li class="hl-step" data-step="5">
+            <button type="button" class="hl-step-h"><span class="hl-num">5</span><span class="hl-step-t">Connect with WHOOP</span></button>
+            <div class="hl-step-b">
+              <ol class="hl-sub" id="connect-steps">
+                <li>Tap <b>Connect with WHOOP</b>. WHOOP opens in a new tab of this browser.</li>
+                <li>Sign in to WHOOP if asked, and tap <b>Grant</b>.</li>
+                <li id="connect-step-3">The page then won't load. That's expected: copy the whole address from the address bar (it starts with <span class="hl-mono">http://localhost:3000/callback</span>) and paste it below.</li>
+              </ol>
+              <div class="wz-actions"><button type="button" class="wz-button" id="connect">Connect with WHOOP</button>
+                <a class="wz-button secondary" id="auth-link" target="_blank" rel="noopener noreferrer" hidden>Open WHOOP sign-in</a></div>
+              <p id="connect-note" class="hl-hint" role="status" aria-live="polite"></p>
+              <form id="paste-form" class="hl-form" autocomplete="off">
+                <label id="paste-label">Address from the browser bar<input class="wz-input" id="f-paste" spellcheck="false" autocapitalize="none" placeholder="http://localhost:3000/callback?code=…" required></label>
+                <div class="wz-actions"><button type="submit" class="wz-button" id="paste-go">Finish connecting</button></div>
+              </form>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <details class="wz-more" id="more" hidden>
+        <summary>Connection details</summary>
+        <dl class="hl-dl" id="details"></dl>
+        <div class="wz-actions">
+          <button type="button" class="wz-button secondary" id="open-keys">Replace keys</button>
+          <button type="button" class="wz-button secondary hl-danger" id="open-disconnect">Disconnect</button>
+        </div>
+      </details>
+    </main>
+    <p id="status" class="wz-status wz-sr" role="status" aria-live="polite"></p>
+  </div>
+
+  <dialog class="wz-sheet" id="sheet-keys" aria-labelledby="sk-h">
+    <h2 id="sk-h">Replace WHOOP keys</h2>
+    <p class="hl-hint">Paste the Client ID and Client Secret from your app on the WHOOP Developer Dashboard. You sign in to WHOOP again afterwards; the synced history stays.</p>
+    <form id="rk-form" class="hl-form" autocomplete="off">
+      <label>Client ID<input class="wz-input" id="rk-cid" autocomplete="off" spellcheck="false" required></label>
+      <label>Client Secret<input class="wz-input" id="rk-secret" type="password" autocomplete="new-password" spellcheck="false" required></label>
+      <label>Redirect URL<input class="wz-input" id="rk-redirect" spellcheck="false" required></label>
+      <div class="wz-actions"><button type="submit" class="wz-button">Save and test</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="wz-sheet" id="sheet-disconnect" aria-labelledby="sd-h">
+    <h2 id="sd-h">Disconnect WHOOP?</h2>
+    <p>The app signs out of WHOOP and deletes its synced copy. Health stops showing WHOOP data. Your data on WHOOP is not touched.</p>
+    <label class="hl-checkrow"><input type="checkbox" id="sd-forget"> Also remove the saved Client ID and Client Secret</label>
+    <div class="wz-actions"><button type="button" class="wz-button hl-danger-fill" id="sd-go">Disconnect</button></div>
+  </dialog>
+</body>
+</html>

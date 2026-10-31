@@ -1,0 +1,3 @@
+# Source and license notice
+
+WHOOP (wizard-whoop) started from Wizard App Manager's hello-wizard reference template (GPL-3.0-only) and keeps its canonical Wizard style snapshot (`web/boot.js`, `web/wizard-tokens.css`, `web/wizard-ui.css`, `web/wizard-sheet.js`, pinned by `appearance-provenance.json`) unchanged. The view loads the shared `/wizard-os-home/core/app-client.js`. The server is Python standard library only. WHOOP is a trademark of WHOOP, Inc.; this app uses WHOOP's public developer API with the owner's own developer app and is not affiliated with WHOOP. Distributed under GPL-3.0-only; no warranty.

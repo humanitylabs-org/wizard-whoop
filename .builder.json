@@ -1,0 +1,6 @@
+{
+  "request": "WHOOP connector: guided in-app setup, OAuth paste-back, synced copy offered through the health-data contract",
+  "template": "hello-wizard",
+  "state": "private_repo",
+  "name": "WHOOP"
+}
