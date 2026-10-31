@@ -6,7 +6,7 @@ type: external
 category: system
 version: 0.2.3
 summary: Connect your WHOOP. Health and your other apps get read-only recovery, sleep, strain and workouts.
-tags: [health, whoop, fitness]
+tags: [data]
 license: GPL-3.0-only
 source: https://github.com/oscarhenrycollins/wizard-whoop
 runtime:
