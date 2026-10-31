@@ -4,10 +4,11 @@ id: wizard-whoop
 name: WHOOP
 type: external
 category: system
-version: 0.2.3
+version: 0.2.4
 summary: Connect your WHOOP. Health and your other apps get read-only recovery, sleep, strain and workouts.
 tags: [data]
 license: GPL-3.0-only
+icon: icon.png
 source: https://github.com/oscarhenrycollins/wizard-whoop
 runtime:
   kind: runtipi

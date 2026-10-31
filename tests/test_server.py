@@ -476,5 +476,21 @@ def check_day(t, d):
     t.assertEqual(set(d['extras']), {'whoop'})
 
 
+
+class IconTest(unittest.TestCase):
+    """Own icon: full-colour store square (icon.png from wizard.md) and a silhouette at web/icon.svg the shell tints.
+    A generic strap with a sensor pod; never WHOOP's own logo or wordmark."""
+    root = Path(__file__).resolve().parent.parent
+
+    def test_icons(self):
+        self.assertIn('\nicon: icon.png\n', (self.root / 'wizard.md').read_text())
+        png = (self.root / 'icon.png').read_bytes()
+        self.assertEqual(png[:8], b'\x89PNG\r\n\x1a\n')
+        self.assertEqual((int.from_bytes(png[16:20], 'big'), int.from_bytes(png[20:24], 'big')), (1024, 1024))
+        mask = (self.root / 'web' / 'icon.svg').read_text()
+        self.assertIn('viewBox="0 0 512 512"', mask)
+        self.assertNotRegex(mask, r'<text|<image|href=')
+        self.assertNotIn('WHOOP', mask + (self.root / 'icon.svg').read_text())
+
 if __name__ == '__main__':
     unittest.main()

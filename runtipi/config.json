@@ -10,8 +10,8 @@
     "network"
   ],
   "description": "Connect your WHOOP with a guided setup inside the app. The app keeps a private synced copy and offers it read-only to other apps on this box through the health-data contract; the Health app shows today, trends and workouts. Keys and sign-in stay in the app.",
-  "tipi_version": 8,
-  "version": "0.2.3",
+  "tipi_version": 9,
+  "version": "0.2.4",
   "source": "https://github.com/oscarhenrycollins/wizard-whoop",
   "exposable": false,
   "supported_architectures": [
@@ -19,7 +19,7 @@
     "arm64"
   ],
   "created_at": 1793378423086,
-  "updated_at": 1793382177659,
+  "updated_at": 1793428782330,
   "dynamic_config": true,
   "min_tipi_version": "4.8.0",
   "uid": 1000,
