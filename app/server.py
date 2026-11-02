@@ -34,7 +34,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'wizard-whoop'
-VERSION = '0.2.6'
+VERSION = '0.2.7'
 PREFIX = '/' + APP_ID
 PORT = os.environ.get('PORT', '8824')
 OAUTH_BASE = os.environ.get('WHOOP_OAUTH_BASE', 'https://api.prod.whoop.com/oauth/oauth2').rstrip('/')
@@ -176,7 +176,14 @@ def db():
             c.execute('ALTER TABLE records ADD COLUMN changed_seq INTEGER NOT NULL DEFAULT 0')
             c.execute('UPDATE records SET changed_seq=1')
             c.execute("INSERT OR REPLACE INTO meta (key,data) VALUES ('seq','1')")
+            c.execute("INSERT OR REPLACE INTO meta (key,data) VALUES ('reemit_need_parts','1')")   # everything just moved
     c.execute('CREATE INDEX IF NOT EXISTS records_changed ON records(changed_seq)')
+    if not c.execute("SELECT 1 FROM meta WHERE key='reemit_need_parts'").fetchone():
+        # 0.2.7 added sleep.need_parts: move every record once so front ends re-read their days with the new field
+        with c:
+            if c.execute('SELECT 1 FROM records LIMIT 1').fetchone():
+                c.execute('UPDATE records SET changed_seq=?', (_next_seq(c),))
+            c.execute("INSERT OR REPLACE INTO meta (key,data) VALUES ('reemit_need_parts','1')")
     return c
 
 
@@ -630,6 +637,11 @@ def _n_sleep(r, main=True):
     if main:
         need_ms = [v for v in need.values() if isinstance(v, (int, float))]
         out['need_h'] = _hours(sum(need_ms)) if need_ms else None
+        # 0.2.7: what the need is made of (hours): the usual night, catch-up for recent short nights, extra after hard
+        # days, minus recent naps (negative). Lets a front end say why the need is high.
+        parts = {'usual_h': need.get('baseline_milli'), 'debt_h': need.get('need_from_sleep_debt_milli'),
+                 'strain_h': need.get('need_from_recent_strain_milli'), 'naps_h': need.get('need_from_recent_nap_milli')}
+        out['need_parts'] = {k: _hours(v) for k, v in parts.items()} if isinstance(parts['usual_h'], (int, float)) else None
     return out
 
 
@@ -660,7 +672,7 @@ def _n_day(day, cyc, rec, sleeps, works):
     sleep = None
     if main or sleeps:
         sleep = _n_sleep(main) if main else {k: None for k in ('start', 'end', 'asleep_h', 'in_bed_h', 'awake_h', 'light_h', 'deep_h',
-                                                                 'rem_h', 'score', 'efficiency_pct', 'respiratory_rate', 'need_h')}
+                                                                 'rem_h', 'score', 'efficiency_pct', 'respiratory_rate', 'need_h', 'need_parts')}
         sleep['naps'] = [_n_sleep(s, main=False) for s in sleeps if s is not main]
     readiness = None
     if rec:

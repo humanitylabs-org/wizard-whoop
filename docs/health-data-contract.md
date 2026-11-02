@@ -146,6 +146,7 @@ Reply:
     "asleep_h": 7.02, "in_bed_h": 7.82, "awake_h": 0.8,
     "light_h": 3.6, "deep_h": 1.7, "rem_h": 1.72,
     "score": 81, "efficiency_pct": 90, "respiratory_rate": 15.4, "need_h": 8.4,
+    "need_parts": {"usual_h": 7.6, "debt_h": 0.7, "strain_h": 0.1, "naps_h": 0.0},
     "naps": [ {"start": "...", "end": "...", "asleep_h": 0.4} ]
   },
   "load": {"value": 12.4, "max": 21, "scale_max": 21, "label": "Strain"},
@@ -175,6 +176,9 @@ Rules:
   `scored`, `pending` (not scored yet), `unscorable`.
 - `sleep` is the main sleep that ended on `date`; `sleep.naps` lists shorter sleeps. Hours are decimal hours;
   `asleep_h` excludes awake time. `sleep.score` is the provider's sleep score or performance, 0-100.
+  `sleep.need_h` is the sleep the provider says the owner needed that night; the optional `sleep.need_parts`
+  splits it into `usual_h` (a normal night), `debt_h` (catch-up for recent short nights), `strain_h` (extra after hard
+  days) and `naps_h` (recent naps, negative), or is `null`.
 - `load` is the day's effort on the provider's own scale; `load.max`, `load.label` and the optional `scale_max`,
   `targets` and `unit` repeat `scales.load`.
 - `calories_kcal` is the day's total energy; `energy_kj` is the same in kilojoules when the provider reports kJ.

@@ -283,6 +283,9 @@ class HealthTest(unittest.TestCase):
         self.assertEqual(d['sleep']['asleep_h'], 7.0)
         self.assertEqual(d['sleep']['deep_h'], 1.5)
         self.assertEqual(d['sleep']['need_h'], 7.83)
+        parts = d['sleep']['need_parts']                      # 0.2.7: what the need is made of
+        self.assertEqual(set(parts), {'usual_h', 'debt_h', 'strain_h', 'naps_h'})
+        self.assertAlmostEqual(sum(v for v in parts.values() if v is not None), 7.83, places=1)
         self.assertEqual(d['sleep']['score'], 88)
         self.assertEqual(d['load'], {'value': 8 + (DAYS - 1) % 10, 'max': 21, 'scale_max': 21, 'label': 'Strain'})
         self.assertEqual(d['calories_kcal'], round((9000 + DAYS - 1) / 4.184))
@@ -448,6 +451,12 @@ class HealthTest(unittest.TestCase):
                 self.assertEqual([d['date'] for d in r['days']], ['2026-08-02'])
                 self.assertEqual(r['cursor'], 'w1.1')
                 self.assertEqual(self.S.contract_days({'changed_since': r['cursor']})['days'], [])
+                # 0.2.7: a 0.2.x database (sequenced, before need_parts) moves every record once, so front ends
+                # re-read their days with the new field; after that the cursor is quiet again
+                db = sqlite3.connect(tmp / 'whoop.sqlite3'); db.execute("DELETE FROM meta WHERE key='reemit_need_parts'"); db.commit(); db.close()
+                r2 = self.S.contract_days({'changed_since': r['cursor']})
+                self.assertEqual([d['date'] for d in r2['days']], ['2026-08-02'])
+                self.assertEqual(self.S.contract_days({'changed_since': r2['cursor']})['days'], [])
             finally:
                 self.S.DATA = data
         finally:
