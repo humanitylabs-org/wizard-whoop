@@ -355,6 +355,14 @@ class HealthTest(unittest.TestCase):
         since = dt.datetime.fromisoformat(cyc[0][2]['start'].replace('Z', '+00:00'))
         self.assertAlmostEqual((dt.datetime.now(dt.timezone.utc) - since).total_seconds() / 86400, S.OVERLAP_DAYS, delta=0.1)
         self.assertEqual(S.status_info()['counts']['days'], DAYS)    # upserts, no duplicates
+        # 0.2.8: profile/body are refreshed every few hours, not on every (5-minute morning) sync
+        self.assertFalse([c for c in FAKE.calls if c[1] in ('/developer/v2/user/profile/basic', '/developer/v2/user/measurement/body')])
+        self.assertLessEqual(len(FAKE.calls), 6)
+        # the morning window follows the zone of the latest WHOOP record (+07:00 here) unless WHOOP_TZ is set
+        utc = dt.timezone.utc
+        self.assertEqual(S.sync_minutes(dt.datetime(2026, 11, 4, 23, 30, tzinfo=utc)), 5)    # 06:30 at +07:00
+        self.assertEqual(S.sync_minutes(dt.datetime(2026, 11, 4, 5, 0, tzinfo=utc)), 20)     # 12:00 at +07:00
+        self.assertEqual(S.status_info()['sync_plan'], {'every_minutes': 20, 'morning_window': '05:00-11:00', 'morning_every_minutes': 5})
 
         # ---- HTTP + MCP
         code, body = http(self.port, 'POST', '/mcp', {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'})
@@ -430,6 +438,34 @@ class HealthTest(unittest.TestCase):
         st = S.status_info()
         self.assertEqual(st['counts'], {'days': 0, 'sleeps': 0, 'workouts': 0})
         self.assertNotEqual(st['dataset'], ds, 'readers must see the copy was wiped')
+
+    def test_morning_sync_interval(self):
+        """0.2.8: every WHOOP_MORNING_SYNC_MINUTES (5) inside WHOOP_MORNING_WINDOW (05:00-11:00 local), else 20."""
+        S, utc = self.S, dt.timezone.utc
+        bkk = dt.timezone(dt.timedelta(hours=7))
+        at = lambda h, m: dt.datetime(2026, 11, 4, h, m, tzinfo=bkk).astimezone(utc)
+        self.assertEqual([S.sync_minutes(at(h, m), bkk) for h, m in ((4, 59), (5, 0), (7, 30), (10, 59), (11, 0), (23, 0))],
+                         [20, 5, 5, 5, 20, 20])
+        saved = (S.MORNING_WINDOW, S.MORNING_SYNC_MINUTES)
+        try:
+            S.MORNING_WINDOW = '22:00-02:00'                          # a window may wrap past midnight
+            self.assertEqual([S.sync_minutes(at(h, 0), bkk) for h, m in ((21, 0), (23, 0), (1, 0), (3, 0))], [20, 5, 5, 20])
+            S.MORNING_WINDOW = ''                                     # off
+            self.assertEqual(S.sync_minutes(at(7, 0), bkk), 20)
+            S.MORNING_WINDOW, S.MORNING_SYNC_MINUTES = '05:00-11:00', 30   # never slower than the normal interval
+            self.assertEqual(S.sync_minutes(at(7, 0), bkk), 20)
+        finally:
+            S.MORNING_WINDOW, S.MORNING_SYNC_MINUTES = saved
+        old = os.environ.get('WHOOP_TZ')
+        try:
+            os.environ['WHOOP_TZ'] = 'America/New_York'
+            self.assertEqual(S.sync_minutes(dt.datetime(2026, 11, 4, 12, 0, tzinfo=utc)), 5)   # 07:00 in New York
+            self.assertEqual(S.sync_minutes(dt.datetime(2026, 11, 4, 0, 0, tzinfo=utc)), 20)   # 19:00 in New York
+        finally:
+            if old is None:
+                os.environ.pop('WHOOP_TZ', None)
+            else:
+                os.environ['WHOOP_TZ'] = old
 
     def test_migrates_013_database(self):
         """A 0.1.3 database (no change sequence) keeps every record and becomes readable through the contract."""
