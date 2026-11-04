@@ -285,7 +285,7 @@ function poll(ms, times) {
 if (!window.WizardApp || WizardApp.version !== 1) {
   say('Wizard system functions are unavailable. Open WHOOP through Wizard.', 'error');
 } else {
-  WizardApp.ready({ name: 'wizard-whoop', version: '0.2.7' });
+  WizardApp.ready({ name: 'wizard-whoop', version: '0.2.8' });
   WizardApp.back.register({ canGoBack: () => false, back: () => false });
 }
 refresh().then(() => poll(S && S.status === 'syncing' ? 3000 : 60000, S && S.status === 'syncing' ? 1200 : 1e9));

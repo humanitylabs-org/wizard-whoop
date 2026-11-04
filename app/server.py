@@ -7,7 +7,8 @@ its own) or a loopback address such as http://localhost:3000/callback, in which 
 the browser landed on back into the app. The code is useless without the client secret that never leaves the box.
 
 The app keeps a local SQLite copy of cycles (strain), recovery, sleep and workouts: a full-history backfill after
-sign-in, then an incremental sync every 20 minutes with a few days of overlap so re-scored records are updated.
+sign-in, then an incremental sync every 20 minutes (every 5 minutes inside the morning window, WHOOP_MORNING_WINDOW /
+WHOOP_MORNING_SYNC_MINUTES / WHOOP_TZ) with a few days of overlap so re-scored records are updated.
 WHOOP has no webhooks on a private box, so polling is the update path. Other apps on the box (the Health app) read
 the copy through the box-only health-data contract: GET /api/status and GET /api/days (docs/health-data-contract.md).
 Every stored change bumps a sequence number, so readers can ask for only the days changed since their cursor.
@@ -34,7 +35,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 ROOT = Path(__file__).resolve().parent.parent if '__file__' in globals() else Path(os.environ.get('APP_ROOT', '.')).resolve()
 DATA = Path(os.environ.get('DATA_DIR', ROOT / '.data'))
 APP_ID = 'wizard-whoop'
-VERSION = '0.2.7'
+VERSION = '0.2.8'
 PREFIX = '/' + APP_ID
 PORT = os.environ.get('PORT', '8824')
 OAUTH_BASE = os.environ.get('WHOOP_OAUTH_BASE', 'https://api.prod.whoop.com/oauth/oauth2').rstrip('/')
@@ -48,6 +49,11 @@ SUGGESTED_APP_NAME = 'Wizard Health'   # the WHOOP developer app's name; any nam
 READ_SCOPES = ['read:recovery', 'read:cycles', 'read:sleep', 'read:workout', 'read:profile', 'read:body_measurement']
 SCOPE = ' '.join(['offline'] + READ_SCOPES)
 SYNC_MINUTES = float(os.environ.get('WHOOP_SYNC_MINUTES', '20'))
+# Mornings sync faster so a night that just ended reaches Health (and a morning report) within minutes of waking.
+# Window in the owner's local time: WHOOP_TZ (IANA name) if set, else the zone of his latest WHOOP record, else the box.
+MORNING_WINDOW = os.environ.get('WHOOP_MORNING_WINDOW', '05:00-11:00')   # empty = off
+MORNING_SYNC_MINUTES = float(os.environ.get('WHOOP_MORNING_SYNC_MINUTES', '5'))
+META_MINUTES = float(os.environ.get('WHOOP_META_MINUTES', '360'))   # profile + body change rarely: refresh every 6 h
 STATE_TTL = float(os.environ.get('WHOOP_STATE_TTL', str(2 * 3600)))   # a sign-in started here stays valid for two hours
 OVERLAP_DAYS = int(os.environ.get('WHOOP_OVERLAP_DAYS', '4'))
 PAGE = 25
@@ -216,6 +222,48 @@ def _offset(s):
         return dt.timezone.utc
     mins = int(m.group(2)) * 60 + int(m.group(3))
     return dt.timezone(dt.timedelta(minutes=-mins if m.group(1) == '-' else mins))
+
+
+def _window(spec=None):
+    """'HH:MM-HH:MM' -> (start, end) minutes after midnight, or None when off/invalid."""
+    m = re.match(r'^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$', MORNING_WINDOW if spec is None else spec or '')
+    if not m:
+        return None
+    a, b = int(m[1]) * 60 + int(m[2]), int(m[3]) * 60 + int(m[4])
+    return (a, b) if a != b and max(a, b) <= 24 * 60 else None
+
+
+def _local_tz():
+    name = os.environ.get('WHOOP_TZ', '').strip()
+    if name:
+        try:
+            from zoneinfo import ZoneInfo
+            return ZoneInfo(name)
+        except Exception:
+            pass
+    try:
+        with LOCK:
+            c = db()
+            row = c.execute("SELECT data FROM records WHERE kind='sleep' ORDER BY start DESC LIMIT 1").fetchone()
+            c.close()
+        off = (json.loads(row['data']) or {}).get('timezone_offset') if row else None
+        if off:
+            return _offset(off)
+    except Exception:
+        pass
+    return dt.datetime.now().astimezone().tzinfo
+
+
+def sync_minutes(now=None, tz=None):
+    """Minutes between syncs right now: MORNING_SYNC_MINUTES inside the morning window, SYNC_MINUTES otherwise.
+    Each incremental sync is ~4-6 WHOOP calls, so 5-minute mornings stay far below WHOOP's 100/min and 10,000/day."""
+    w = _window()
+    if not w or MORNING_SYNC_MINUTES <= 0:
+        return SYNC_MINUTES
+    local = (now or _now()).astimezone(tz or _local_tz())
+    t = local.hour * 60 + local.minute
+    inside = w[0] <= t < w[1] if w[0] < w[1] else (t >= w[0] or t < w[1])   # a window may wrap past midnight
+    return min(SYNC_MINUTES, MORNING_SYNC_MINUTES) if inside else SYNC_MINUTES
 
 
 def _ago(iso):
@@ -537,7 +585,8 @@ def sync(full=False):
         for kind, path in COLLECTIONS:
             counts[kind] = _pull(kind, path, since)
             time.sleep(REQUEST_GAP)
-        for key, path in (('profile', '/v2/user/profile/basic'), ('body', '/v2/user/measurement/body')):
+        meta_due = full or _ago(st.get('meta_at')) >= META_MINUTES * 60
+        for key, path in (('profile', '/v2/user/profile/basic'), ('body', '/v2/user/measurement/body')) if meta_due else ():
             d = api_get(path)
             if isinstance(d, dict):
                 with LOCK:
@@ -546,6 +595,8 @@ def sync(full=False):
                         c.execute('INSERT OR REPLACE INTO meta (key,data) VALUES (?,?)', (key, json.dumps(d)))
                     c.close()
         _fix_days()
+        if meta_due:
+            _update_state(meta_at=_iso(_now()))
         _update_state(last_sync=_iso(_now()), last_error=None, backfilled=True, auth='connected', syncing=None, progress=None,
                       sync_kind=None, last_counts=counts, rate_limited_until=None)
         return dict(status_info(), pulled=counts)
@@ -574,7 +625,7 @@ def _scheduler():
     while True:
         st = _state()
         if _tokens().get('refresh_token') or _tokens().get('access_token'):
-            due = not st.get('backfilled') or _ago(st.get('last_sync')) >= SYNC_MINUTES * 60
+            due = not st.get('backfilled') or _ago(st.get('last_sync')) >= sync_minutes() * 60
             if due and (st.get('rate_limited_until') or 0) <= time.time():
                 _safe_sync(full=not st.get('backfilled'))
         WAKE.wait(60)
@@ -840,14 +891,16 @@ def status_info():
         state = 'connected'
     counts, first, last = _counts()
     prof = _meta('profile') or {}
-    nxt = None
+    nxt, every = None, sync_minutes()
     if state in ('connected', 'rate_limited') and st.get('last_sync'):
-        nxt = _iso(_parse(st['last_sync']) + dt.timedelta(minutes=SYNC_MINUTES))
+        nxt = _iso(_parse(st['last_sync']) + dt.timedelta(minutes=every))
     live = state in ('connected', 'syncing', 'rate_limited')
     return {
         'contract': CONTRACT, 'source': SOURCE, 'status': state, 'version': VERSION,
         'account': {'name': prof.get('first_name')} if live or counts else None, 'dataset': _dataset(),
-        'last_sync': st.get('last_sync'), 'next_sync': nxt, 'sync_every_minutes': SYNC_MINUTES,
+        'last_sync': st.get('last_sync'), 'next_sync': nxt, 'sync_every_minutes': every,
+        'sync_plan': {'every_minutes': SYNC_MINUTES, 'morning_window': MORNING_WINDOW if _window() else None,
+                      'morning_every_minutes': MORNING_SYNC_MINUTES if _window() else None},
         'history_from': first, 'latest_date': last,
         'counts': {'days': counts.get('cycle', 0), 'sleeps': counts.get('sleep', 0), 'workouts': counts.get('workout', 0)},
         'error': st.get('last_error'), 'scales': SCALES,
@@ -910,7 +963,7 @@ _NONE = {'type': 'object', 'properties': {}, 'additionalProperties': False}
 TOOLS = [
     {'name': 'health_data_status', 'description': "WHOOP connector status (contract wizard.health-data/1): not_configured, needs_login, syncing, connected or rate_limited; the connected account's first name, last/next sync, history span and record counts. Never returns keys or tokens. If not connected, send the owner the WHOOP app link [WHOOP](/wizard-whoop/); its own screen walks him through setup. Never ask for WHOOP keys, passwords or codes in chat. For health questions use the Health app's tools instead.",
      'inputSchema': _NONE, 'annotations': {'readOnlyHint': True}},
-    {'name': 'health_data_sync', 'description': 'Ask the WHOOP connector to pull new data from WHOOP now (it also syncs every 20 minutes). Returns at once; check health_data_status for progress. Reads WHOOP only.',
+    {'name': 'health_data_sync', 'description': 'Ask the WHOOP connector to pull new data from WHOOP now (it also syncs every 20 minutes, every 5 in the morning). Returns at once; check health_data_status for progress. Reads WHOOP only.',
      'inputSchema': _NONE, 'annotations': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': True}},
     {'name': 'health_data_days', 'description': 'Raw contract read: normalized WHOOP day records (readiness/recovery, HRV, resting HR, SpO2, skin temp, sleep, strain, calories, workouts, extras.whoop), oldest first, paged with next_page; pass changed_since=<cursor> to get only changed days. For owner questions prefer the Health app tools.',
      'inputSchema': {'type': 'object', 'properties': {
